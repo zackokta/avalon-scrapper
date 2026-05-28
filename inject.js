@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  // 1. DAFTAR API TARGET (Penyaring Sampah & Pencegah Memory Leak)
+  // ==================== TARGET API FILTER ====================
   const TARGET_APIS = [
     "/api/v4/pdp/",
     "/api/v2/add_on_deal/",
@@ -23,121 +23,97 @@
     return TARGET_APIS.some((api) => url.includes(api));
   }
 
-  // Helper untuk mengekstrak URL dengan aman dari argumen fetch
-  function getSafeUrl(arg) {
-    if (typeof arg === "string") return arg;
-    if (arg instanceof URL) return arg.href;
-    if (arg instanceof Request) return arg.url;
-    if (arg && typeof arg === "object" && arg.url) return String(arg.url);
-    return "";
+  // ==================== STEALTH: Spoof toString ====================
+  function spoofToString(originalFn, name) {
+    try {
+      Object.defineProperty(originalFn, "toString", {
+        value: () => `function ${name}() { [native code] }`,
+        writable: false,
+        enumerable: false,
+        configurable: true,
+      });
+    } catch (e) {}
   }
 
-  // ==========================================
-  // 2. MODIFIKASI FETCH (Modern API - Enterprise Grade)
-  // ==========================================
+  // ==================== FETCH INTERCEPTOR ====================
   const OriginalFetch = window.fetch;
-  window.fetch = new Proxy(OriginalFetch, {
+
+  const ProxiedFetch = new Proxy(OriginalFetch, {
     apply: function (target, thisArg, args) {
       const fetchPromise = Reflect.apply(target, thisArg, args);
 
-      fetchPromise
-        .then((response) => {
-          try {
-            const fetchUrl = getSafeUrl(args[0]);
+      fetchPromise.then((response) => {
+        try {
+          const fetchUrl = args[0] && typeof args[0] === "object" && args[0].url
+            ? args[0].url
+            : args[0];
 
-            // HANYA clone dan parse jika URL termasuk dalam target sadapan bosmu!
-            if (isTargetUrl(fetchUrl)) {
-              const contentType = response.headers.get("content-type");
-              if (contentType && contentType.includes("json")) {
-                response
-                  .clone()
-                  .json()
-                  .then((data) => {
-                    try {
-                      // Kirim data menggunakan sinyal original agar bosmu tidak curiga
-                      window.dispatchEvent(
-                        new CustomEvent("VyuSys_Internal_Sync_99", {
-                          detail: {
-                            type: "fetch",
-                            url: fetchUrl,
-                            data: data,
-                            args:
-                              args.length > 1 && typeof args[1] === "object"
-                                ? {
-                                    method: args[1].method,
-                                    headers: args[1].headers,
-                                  }
-                                : [],
-                          },
-                        }),
-                      );
-                    } catch (dispatchError) {
-                      console.error(
-                        "[Avalon Injector] Gagal mengirim event sync:",
-                        dispatchError,
-                      );
-                    }
-                  })
-                  .catch((parseError) => {
-                    // Abaikan silent error jika JSON tidak valid dari server
-                  });
-              }
+          if (isTargetUrl(fetchUrl)) {
+            const contentType = response.headers.get("content-type");
+            if (contentType && contentType.includes("json")) {
+              response.clone().json().then((data) => {
+                try {
+                  // Jitter kecil agar tidak terlalu burst
+                  setTimeout(() => {
+                    window.dispatchEvent(
+                      new CustomEvent("VyuSys_Internal_Sync_99", {
+                        detail: {
+                          type: "fetch",
+                          url: fetchUrl,
+                          data: data,
+                          args: args.length > 1 && typeof args[1] === "object"
+                            ? {
+                                method: args[1].method,
+                                headers: args[1].headers,
+                              }
+                            : [],
+                        },
+                      })
+                    );
+                  }, Math.random() * 80 + 20);
+                } catch (dispatchError) {
+                  // Silent error (kurangi jejak)
+                }
+              }).catch(() => {});
             }
-          } catch (headerError) {
-            console.error(
-              "[Avalon Injector] Error saat membaca tipe headers:",
-              headerError,
-            );
           }
-        })
-        .catch((networkError) => {
-          // Abaikan network error asli (seperti timeout internet)
-        });
+        } catch (e) {}
+      }).catch(() => {});
 
       return fetchPromise;
     },
   });
 
-  // ==========================================
-  // 3. MODIFIKASI XHR (Legacy API - Enterprise Grade)
-  // ==========================================
+  // Spoof toString agar terlihat native
+  spoofToString(ProxiedFetch, "fetch");
+  window.fetch = ProxiedFetch;
+
+  // ==================== XHR INTERCEPTOR ====================
   const OriginalXHR = window.XMLHttpRequest;
   const OriginalOpen = OriginalXHR.prototype.open;
+  const OriginalSend = OriginalXHR.prototype.send;
 
   OriginalXHR.prototype.open = new Proxy(OriginalOpen, {
     apply: function (target, thisArg, args) {
       try {
-        thisArg._intercepted_url = getSafeUrl(args[1]);
-      } catch (e) {
-        console.error("[Avalon Injector] Error saat inisialisasi XHR Open:", e);
-      }
+        thisArg._intercepted_url = args[1];
+      } catch (e) {}
       return Reflect.apply(target, thisArg, args);
     },
   });
 
-  const OriginalSend = OriginalXHR.prototype.send;
   OriginalXHR.prototype.send = new Proxy(OriginalSend, {
     apply: function (target, thisArg, args) {
       try {
         thisArg.addEventListener("load", function () {
           try {
-            // HANYA proses jika URL termasuk dalam target sadapan
             if (isTargetUrl(this._intercepted_url)) {
               const contentType = this.getResponseHeader("content-type");
               if (contentType && contentType.includes("json")) {
-                let parsedData = null;
+                const parsedData = JSON.parse(this.responseText);
 
-                // [AVALON FIX]: Menghindari InvalidStateError jika tipe respon bukan text
-                if (this.responseType === "json") {
-                  parsedData = this.response; // Sudah dalam bentuk Objek JSON
-                } else if (
-                  this.responseType === "" ||
-                  this.responseType === "text"
-                ) {
-                  parsedData = JSON.parse(this.responseText); // Masih dalam bentuk String
-                }
-
-                if (parsedData) {
+                // Jitter kecil
+                setTimeout(() => {
                   window.dispatchEvent(
                     new CustomEvent("VyuSys_Internal_Sync_99", {
                       detail: {
@@ -146,29 +122,24 @@
                         data: parsedData,
                         args: [],
                       },
-                    }),
+                    })
                   );
-                }
+                }, Math.random() * 80 + 20);
               }
             }
-          } catch (e) {
-            console.error(
-              "[Avalon Injector] Gagal memproses data XHR JSON:",
-              e,
-            );
-          }
+          } catch (e) {}
         });
-      } catch (e) {
-        console.error(
-          "[Avalon Injector] Error saat memasang event listener XHR:",
-          e,
-        );
-      }
+      } catch (e) {}
+
       return Reflect.apply(target, thisArg, args);
     },
   });
 
+  // Spoof toString untuk XHR
+  spoofToString(OriginalXHR.prototype.open, "open");
+  spoofToString(OriginalXHR.prototype.send, "send");
+
   console.log(
-    "[Avalon Injector] Berhasil dimuat dengan perlindungan XHR/Fetch tingkat lanjut.",
+    "[Avalon Injector] Berhasil dimuat dengan stealth protection tingkat lanjut.",
   );
 })();
