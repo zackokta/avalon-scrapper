@@ -4119,46 +4119,39 @@ var content = function() {
               window.location.reload();
             }),
             $("performRandomScroll", async () => {
-              // Autonomous randomized scrolling to trigger lazy-loaded API elements
-              const performAutonomousScroll = () => {
+              console.log("[Autonomous Scroll] Starting enhanced autonomous scrolling...");
+
+              const performNaturalScroll = async () => {
                 let scrollCount = 0;
-                const maxScrolls = 5;
+                const maxScrolls = 4 + Math.floor(Math.random() * 3); // 4 - 6 kali scroll
 
-                const scrollStep = () => {
-                  if (scrollCount >= maxScrolls) {
-                    console.log(
-                      "[Autonomous Scroll] Completed 5 scroll actions",
-                    );
-                    return;
-                  }
+                while (scrollCount < maxScrolls) {
+                  // Random distance antara 550px - 1250px
+                  const distance = Math.floor(Math.random() * (1250 - 550 + 1)) + 550;
 
-                  // Randomize distance between 600px and 1200px
-                  const distance =
-                    Math.floor(Math.random() * (1200 - 600 + 1)) + 600;
+                  // Kadang scroll ke atas (15% kemungkinan)
+                  const direction = Math.random() < 0.15 ? -1 : 1;
 
-                  // Use window.scrollBy with smooth behavior
                   window.scrollBy({
-                    top: distance,
+                    top: distance * direction,
                     behavior: "smooth",
                   });
 
                   scrollCount++;
                   console.log(
-                    `[Autonomous Scroll] Scroll ${scrollCount}/${maxScrolls}: ${distance}px`,
+                    `[Autonomous Scroll] Scroll ${scrollCount}/${maxScrolls} | Distance: ${distance}px | Direction: ${direction > 0 ? "down" : "up"}`
                   );
 
-                  // Schedule next scroll with random delay between 2000ms and 4000ms
-                  const delay =
-                    Math.floor(Math.random() * (4000 - 2000 + 1)) + 2000;
-                  setTimeout(scrollStep, delay);
-                };
+                  // Delay antar scroll: 1800ms - 4200ms (lebih natural)
+                  const delay = Math.floor(Math.random() * (4200 - 1800 + 1)) + 1800;
+                  await new Promise((resolve) => setTimeout(resolve, delay));
+                }
 
-                // Start the scrolling sequence immediately after minimal DOM interaction
-                setTimeout(scrollStep, 100);
+                console.log("[Autonomous Scroll] Completed enhanced scrolling sequence.");
               };
 
-              // Trigger the autonomous scrolling
-              performAutonomousScroll();
+              // Mulai scrolling setelah jeda kecil
+              setTimeout(performNaturalScroll, 150);
             }),
             $("solveCaptcha", async () => {
               console.log("Received request to solve captcha. Starting now.");
